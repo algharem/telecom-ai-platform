@@ -1,6 +1,6 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends, Request
 from fastapi.responses import JSONResponse
-from typing import List
+from typing import List, Dict, Any
 import uuid
 from datetime import datetime
 import time
@@ -213,3 +213,129 @@ def _log_prediction(response: PredictionResponse) -> None:
         f"Prediction logged: {response.prediction_id}, "
         f"gNB={response.gnb_id}, anomaly={response.result.is_anomaly}"
     )
+
+
+# Data source endpoints (Phase 4: Real log integration)
+
+@router.get("/data-source/status")
+async def get_data_source_status(request: Request) -> Dict[str, Any]:
+    """
+    Get current data source configuration and status.
+    
+    Returns info about whether using simulator or real logs,
+    plus source-specific metadata.
+    """
+    provider = request.app.data_provider
+    
+    if not provider:
+        return {
+            "status": "error",
+            "message": "Data provider not initialized"
+        }
+    
+    return {
+        "timestamp": datetime.utcnow().isoformat(),
+        "available": provider.is_available(),
+        "source_info": provider.get_source_info()
+    }
+
+
+@router.get("/logs/status")
+async def get_logs_status(request: Request) -> Dict[str, Any]:
+    """
+    Get status of log file data source.
+    
+    Returns:
+    - logs_path: Directory being monitored
+    - nfs_monitored: Network functions being parsed
+    - last_parse_time: When logs were last processed
+    - parse_rate: Records parsed per minute
+    """
+    provider = request.app.data_provider
+    monitor = request.app.pipeline_monitor
+    
+    if not provider or not monitor:
+        return {"error": "Services not initialized"}
+    
+    source_info = provider.get_source_info()
+    
+    return {
+        "timestamp": datetime.utcnow().isoformat(),
+        "data_source": source_info.get("type", "unknown"),
+        "base_path": source_info.get("base_path"),
+        "watched_nfs": source_info.get("watched_nfs", []),
+        "is_ready": source_info.get("is_ready", False),
+        "parse_rate_per_minute": monitor.get_parse_rate_per_minute(),
+        "source_details": source_info
+    }
+
+
+@router.post("/kpi/batch/from-data-source")
+async def get_kpi_batch(
+    request: Request,
+    limit: int = 100
+) -> Dict[str, Any]:
+    """
+    Get next batch of KPI records from current data source.
+    
+    Used to fetch real log data or simulator data for batch processing.
+    
+    Args:
+        limit: Max number of records to return (default 100)
+    
+    Returns:
+    - records: List of KPI records with anomaly labels
+    - source: Whether records came from "simulator" or "logs"
+    - count: Number of records returned
+    """
+    provider = request.app.data_provider
+    detector = request.app.anomaly_detector
+    monitor = request.app.pipeline_monitor
+    
+    if not provider or not detector:
+        raise HTTPException(
+            status_code=503,
+            detail="Data provider or detector not initialized"
+        )
+    
+    try:
+        # Get batch from data provider
+        batch = provider.get_next_batch(limit)
+        
+        if not batch:
+            return {
+                "records": [],
+                "source": provider.get_source_info().get("type", "unknown"),
+                "count": 0
+            }
+        
+        # Apply anomaly detection
+        results = []
+        for record in batch:
+            is_anomaly, reason = detector.detect(record)
+            
+            # Track in monitor
+            if monitor:
+                monitor.record_anomaly(record.gnb_id, is_anomaly)
+            
+            results.append({
+                "timestamp": record.timestamp.isoformat(),
+                "gnb_id": record.gnb_id,
+                "prb_usage": record.prb_usage,
+                "throughput": record.throughput,
+                "latency": record.latency,
+                "packet_loss": record.packet_loss,
+                "is_anomaly": is_anomaly,
+                "anomaly_reason": reason,
+                "source": record.source
+            })
+        
+        return {
+            "records": results,
+            "source": provider.get_source_info().get("type", "unknown"),
+            "count": len(results)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching KPI batch: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error fetching batch: {str(e)}")

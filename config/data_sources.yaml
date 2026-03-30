@@ -1,0 +1,73 @@
+# Data Source Configuration
+# Switch between simulator and real log sources
+
+# Active data source: "simulator" or "logs"
+data_source: "simulator"
+
+# Simulator configuration (used when data_source: simulator)
+simulator:
+  enabled: true
+  base_stations: 10
+  random_seed: 42
+  hours: 168
+  anomaly_rate: 0.05
+
+# Log file configuration (used when data_source: logs)
+logs:
+  enabled: false
+  base_path: "/var/log/open5gs"
+  
+  # Network functions to monitor
+  watched_nfs:
+    - amf
+    - upf
+    - nrf
+    - ausf
+  
+  # How often to poll for new logs (seconds)
+  polling_interval_seconds: 5
+  
+  # Log aggregation settings
+  aggregation:
+    # Time window for KPI metrics (seconds)
+    window_seconds: 60
+    
+    # Maximum records to buffer before flushing
+    max_buffer_size: 10000
+    
+    # Flush interval if buffer not full (seconds)
+    flush_interval_seconds: 30
+
+# Anomaly detection thresholds
+anomaly_detection:
+  enabled: true
+  
+  # Pattern-based thresholds
+  thresholds:
+    # PRB usage > 90% indicates congestion
+    prb_usage_percent: 90
+    
+    # Latency > 50ms indicates issues
+    latency_ms: 50
+    
+    # Packet loss > 1% indicates problems
+    packet_loss_percent: 1
+    
+    # Registration success < 95% (for anomaly labeling)
+    registration_success_rate_percent: 95
+    
+    # Throughput drop > 20% in sliding window
+    throughput_drop_percent: 20
+
+# Monitoring and observability
+monitoring:
+  enabled: true
+  
+  # Track metrics per minute
+  metrics_window_minutes: 1
+  
+  # Keep stats for last N minutes
+  retention_minutes: 60
+  
+  # Log level for pipeline
+  log_level: "INFO"  # DEBUG, INFO, WARNING, ERROR
