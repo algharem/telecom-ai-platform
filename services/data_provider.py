@@ -14,6 +14,8 @@ import logging
 
 from models.schemas import KPIMetrics, PredictionRequest
 from services.kpi_simulator import TelecomKPISimulator
+from parsers.open5gs_real_parser import parse_open5gs_logs
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -163,45 +165,98 @@ class LogFileDataProvider(DataProvider):
     """
     Data provider reading from real Open5GS log files.
     
-    Reads parsed log data and converts to KPIRecord format.
-    Will be implemented in Phase 2 when aggregation engine is ready.
+    Parses actual Open5GS logs (AMF, SMF, UPF, etc.) and converts
+    session/event data into gNB-level KPI metrics.
     """
     
     def __init__(self, config: Dict[str, Any]):
         self.config = config
-        self.base_path = config.get("base_path", "/var/log/open5gs")
+        self.base_path = Path(config.get("base_path", "/var/log/open5gs"))
         self.watched_nfs = config.get("watched_nfs", ["amf", "upf", "nrf", "ausf"])
         self.polling_interval = config.get("polling_interval_seconds", 5)
         
-        # Placeholder - will be connected to log aggregator in Phase 2
-        self.buffer = []
+        # Load and parse logs
+        self.kpi_records = []
+        self.current_position = 0
         self.is_ready = False
+        self.last_parse_time = None
+        
+        # Try to load logs
+        self._load_logs()
         
         logger.info(f"[PROVIDER] LogFileDataProvider initialized: {self.base_path}")
+        logger.info(f"[PROVIDER] Loaded {len(self.kpi_records)} KPI records from logs")
+    
+    def _load_logs(self):
+        """Load and parse all log files in directory"""
+        try:
+            if not self.base_path.exists():
+                logger.warning(f"Log directory not found: {self.base_path}")
+                return
+            
+            # Parse logs using real parser
+            kpi_dicts = parse_open5gs_logs(self.base_path)
+            logger.info(f"[PROVIDER] Parsed logs returned {len(kpi_dicts)} gNB metrics")
+            
+            # Convert to KPIRecord format
+            for kpi_dict in kpi_dicts:
+                record = KPIRecord(
+                    timestamp=datetime.fromisoformat(kpi_dict['timestamp']),
+                    gnb_id=kpi_dict['gnb_id'],
+                    prb_usage=kpi_dict['prb_usage'],
+                    throughput=kpi_dict['throughput'],
+                    latency=kpi_dict['latency'],
+                    packet_loss=kpi_dict['packet_loss'],
+                    source="logs"
+                )
+                self.kpi_records.append(record)
+            
+            self.is_ready = True
+            self.last_parse_time = datetime.utcnow()
+            
+            if self.kpi_records:
+                logger.info(f"[PROVIDER] Successfully loaded {len(self.kpi_records)} KPI records from logs")
+            else:
+                logger.warning("[PROVIDER] No KPI records generated from logs")
+                
+        except Exception as e:
+            logger.error(f"[PROVIDER] Error loading logs: {e}", exc_info=True)
+            self.is_ready = False
     
     def get_next_batch(self, limit: int = 100) -> List[KPIRecord]:
-        """Return next batch from logs (placeholder)"""
-        # TODO: Phase 2 - integrate with gNB aggregator
-        return self.buffer[:limit]
+        """Return next batch from logs"""
+        if not self.kpi_records:
+            return []
+        
+        # Cycle through records if we reach the end
+        if self.current_position >= len(self.kpi_records):
+            self.current_position = 0
+        
+        end_pos = min(self.current_position + limit, len(self.kpi_records))
+        batch = self.kpi_records[self.current_position:end_pos]
+        self.current_position = end_pos
+        
+        return batch
     
     def is_available(self) -> bool:
-        """Check if logs exist and are readable"""
-        # TODO: Phase 2 - check if log files exist
-        return self.is_ready
+        """Check if logs are loaded and ready"""
+        return self.is_ready and len(self.kpi_records) > 0
     
     def get_source_info(self) -> Dict[str, Any]:
         """Return log source metadata"""
         return {
             "type": "logs",
-            "base_path": self.base_path,
+            "base_path": str(self.base_path),
             "watched_nfs": self.watched_nfs,
-            "buffer_size": len(self.buffer),
-            "is_ready": self.is_ready
+            "records_loaded": len(self.kpi_records),
+            "is_ready": self.is_ready,
+            "last_parse_time": self.last_parse_time.isoformat() if self.last_parse_time else None
         }
     
     def close(self):
         """Cleanup"""
-        self.buffer = []
+        self.kpi_records = []
+        self.current_position = 0
 
 
 def create_data_provider(source_type: str, config: Dict[str, Any]) -> DataProvider:
