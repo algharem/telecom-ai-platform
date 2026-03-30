@@ -12,7 +12,8 @@ from models.schemas import (
     SimulationConfig,
     HealthStatus
 )
-from services.ml_detector import AnomalyDetector
+from services.ml_detector import AnomalyDetector as MLAnomalyDetector
+from services.anomaly_detector import AnomalyDetector as PatternAnomalyDetector
 from services.kpi_simulator import TelecomKPISimulator
 from utils.logging_config import setup_logging
 from utils.exceptions import TelecomAIException, ModelNotTrainedException
@@ -22,26 +23,59 @@ logger = setup_logging()
 router = APIRouter()
 
 # Global service instances (in production, use dependency injection)
-detector = AnomalyDetector()
+ml_detector = MLAnomalyDetector()  # For ML-based detection (requires training)
 simulator = TelecomKPISimulator()
 
 
 @router.post("/predict", response_model=PredictionResponse)
 async def predict_anomaly(
     request: PredictionRequest,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
+    http_request: Request
 ):
     """
     Predict anomaly for a single gNB KPI measurement.
     
     This endpoint mimics NWDAF's "Nnwdaf_AnalyticsInfo" service operation.
     In 5G Core, AMF/SMF would call this to get network analytics.
+    
+    Note: Uses pattern-based detection (no model training required) or ML-based
+    if model is trained. Falls back to pattern-based for immediate results.
     """
     start_time = time.time()
     
     try:
-        # Perform prediction
-        result = detector.predict(request)
+        # Try ML-based detection first if available
+        if ml_detector.is_trained:
+            result = ml_detector.predict(request)
+            detection_method = "ml"
+        else:
+            # Fall back to pattern-based detection (no training required)
+            pattern_detector = http_request.app.anomaly_detector
+            if pattern_detector:
+                # Create KPI record from request for pattern detection
+                from models.schemas import KPIRecord
+                kpi = KPIRecord(
+                    timestamp=datetime.utcnow(),
+                    gnb_id=request.gnb_id,
+                    prb_usage=request.metrics.prb_usage,
+                    throughput=request.metrics.throughput_mbps,
+                    latency=request.metrics.latency_ms,
+                    packet_loss=request.metrics.packet_loss_percent,
+                    source="api"
+                )
+                is_anomaly, reason = pattern_detector.detect(kpi)
+                
+                # Convert to AnomalyResult format
+                result = AnomalyResult(
+                    is_anomaly=is_anomaly,
+                    anomaly_score=0.8 if is_anomaly else 0.2,
+                    explanation=reason,
+                    affected_metrics=[]
+                )
+                detection_method = "pattern"
+            else:
+                raise TelecomAIException("No anomaly detector available", "DETECTOR_NOT_INIT")
         
         # Determine recommended action (SON-style automation)
         action = _determine_action(result, request.metrics)
@@ -70,14 +104,14 @@ async def predict_anomaly(
             detail={
                 "error": e.error_code,
                 "message": e.message,
-                "resolution": "POST /train to initialize model"
+                "resolution": "POST /train to initialize model or use pattern-based detection"
             }
         )
     except TelecomAIException as e:
         logger.error(f"Telecom AI error: {e.message}")
         raise HTTPException(status_code=400, detail=e.message)
     except Exception as e:
-        logger.error(f"Unexpected error: {str(e)}")
+        logger.error(f"Unexpected error: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal processing error")
 
 
@@ -87,14 +121,14 @@ async def predict_batch(requests: List[PredictionRequest]):
     Batch prediction for multiple gNBs.
     Efficient for RIC (RAN Intelligent Controller) periodic polling.
     """
-    if not detector.is_trained:
+    if not ml_detector.is_trained:
         raise HTTPException(
             status_code=503,
-            detail="Model not trained. Call /train first."
+            detail="Model not trained. Call /train first or use single /predict endpoint."
         )
     
     start_time = time.time()
-    results = detector.batch_predict(requests)
+    results = ml_detector.batch_predict(requests)
     
     responses = []
     for req, res in zip(requests, results):
@@ -129,13 +163,13 @@ async def train_model(config: SimulationConfig = SimulationConfig()):
         )
         
         # Train model
-        metrics = detector.train(df)
+        metrics = ml_detector.train(df)
         
         return {
             "status": "success",
             "training_metrics": metrics,
             "simulation_stats": simulator.get_statistics(df),
-            "model_info": detector.get_model_info()
+            "model_info": ml_detector.get_model_info()
         }
         
     except Exception as e:
