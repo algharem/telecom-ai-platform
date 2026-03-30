@@ -1,0 +1,88 @@
+# config.yaml
+app:
+  name: "telecom-ai-platform"
+  version: "3.0.0"             # Phase 3
+  debug: false
+
+api:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 1
+
+ml:
+  model_path: "./data/anomaly_detector.pkl"
+  contamination: 0.05
+  n_estimators: 100
+  random_state: 42
+
+nwdaf:
+  analytics_retention_hours: 168
+  subscription_ttl_seconds: 3600
+  time_series_resolution: "5m"
+  forecasting_horizon_hours: 24
+  supported_analytics:
+    - LOAD_LEVEL_INFORMATION
+    - SERVICE_EXPERIENCE
+    - NF_LOAD
+    - NETWORK_PERFORMANCE
+    - USER_DATA_CONGESTION
+    - ANOMALY_EVENTS
+
+# Phase 3: O-RAN xApp Configuration
+oran:
+  xapp_id: "xapp-smart-optimizer"
+  xapp_version: "1.0.0"
+  ric_platform_url: "http://ric.platform:8080"
+  e2_node_ids: ["gNB_001", "gNB_002", "gNB_003"]
+  
+  # Control loop timing (Near-RT RIC: 10ms-1s)
+  control_loop_interval_ms: 100  # 100ms = 10Hz
+  
+  # E2 interface settings
+  e2ap:
+    procedure_code: 8            # RICcontrol
+    ric_style_type: 1            # MAC Control
+    timeout_ms: 500
+  
+  # xApp policies
+  policies:
+    admission_control:
+      enabled: true
+      prb_threshold: 85          # Block new users above 85% PRB
+      handover_margin: 5         # % margin before triggering
+      
+    congestion_control:
+      enabled: true
+      latency_threshold_ms: 50
+      throughput_drop_threshold: 30  # %
+      
+    energy_saving:
+      enabled: false
+      off_peak_shutdown: true
+
+infrastructure:
+  redis_url: "redis://localhost:6379"
+  influxdb_url: "http://localhost:8086"
+  influxdb_token: "telecom-ai-token"
+  influxdb_org: "telecom"
+  influxdb_bucket: "nwdaf_analytics"
+  
+  # Message bus for xApps (simulating RMR)
+  kafka_brokers: "localhost:9092"
+  xapp_topic: "xapp-control-messages"
+
+kpi_simulator:
+  base_stations: 10
+  simulation_hours: 168
+  anomaly_rate: 0.05
+  
+  thresholds:
+    prb_usage_max: 100
+    throughput_max: 1000
+    latency_max: 200
+    packet_loss_max: 5
+
+logging:
+  level: "INFO"
+  format: "json"
+  file: "./logs/telecom-ai.log"
