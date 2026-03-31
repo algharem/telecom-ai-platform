@@ -121,11 +121,11 @@ class Open5GSRealLogParser:
     def _parse_amf_line(self, line: str, timestamp: datetime, nf_type: str) -> Optional[SessionEvent]:
         """Parse AMF/MME log lines for attach/registration events"""
         
-        # Extract IMSI if present
+        # Extract IMSI if present (15 digits in brackets)
         imsi_match = re.search(r'\[(\d{15})\]', line)
         imsi = imsi_match.group(1) if imsi_match else None
         
-        # Extract cell ID (CellID[0xXXXXX])
+        # Extract cell ID (CellID[0xXXXXX] or similar variants)
         cell_match = re.search(r'CellID\[([^\]]+)\]', line)
         cell_id = cell_match.group(1) if cell_match else None
         
@@ -133,15 +133,21 @@ class Open5GSRealLogParser:
         ue_id_match = re.search(r'(?:ENB_UE_S1AP_ID|MME_UE_S1AP_ID)\[(\d+)\]', line)
         ue_id = ue_id_match.group(1) if ue_id_match else None
         
-        # Classify event type
-        if 'Attach request' in line or 'Attach' in line:
+        # Classify event type - be more flexible with pattern matching
+        event_type = None
+        
+        # Session start patterns
+        if any(x in line for x in ['Attach', 'attach', 'registration', 'Registration', 'initiated', 'create']):
             event_type = 'session_start'
-        elif 'Removed Session' in line:
+        # Session end patterns
+        elif any(x in line for x in ['Released', 'released', 'Remove', 'remove', 'deleted', 'Deleted', 'end']):
             event_type = 'session_end'
-        elif 'LOCATION-UPDATE-REJECT' in line or 'UPDATE-REJECT' in line:
-            event_type = 'auth_failure'
-        elif 'reject' in line.lower():
-            event_type = 'attach_failure'
+        # Auth/failure patterns
+        elif any(x in line for x in ['reject', 'Reject', 'failure', 'Failure', 'failed', 'Failed', 'error', 'Error']):
+            if 'attach' in line.lower():
+                event_type = 'attach_failure'
+            else:
+                event_type = 'auth_failure'
         else:
             return None
         
@@ -159,20 +165,20 @@ class Open5GSRealLogParser:
     def _parse_smf_line(self, line: str, timestamp: datetime) -> Optional[SessionEvent]:
         """Parse SMF log lines for session and data events"""
         
-        # Extract IMSI
-        imsi_match = re.search(r'IMSI\[(\d{15})\]', line)
+        # Extract IMSI (15 digits)
+        imsi_match = re.search(r'(?:IMSI|imsi)\[?(\d{15})\]?', line)
         imsi = imsi_match.group(1) if imsi_match else None
         
-        # Extract APN
+        # Extract APN (any identifier in brackets after APN)
         apn_match = re.search(r'APN\[([^\]]+)\]', line)
         apn = apn_match.group(1) if apn_match else None
         
-        # Classify event
-        if 'Added' in line and 'SMF-UEs' in line:
+        # Classify event - be more flexible
+        event_type = None
+        
+        if any(x in line for x in ['Added', 'added', 'create', 'Create', 'session', 'Session']):
             event_type = 'session_start'
-        elif 'Removed Session' in line:
-            event_type = 'session_end'
-        elif 'Removed' in line and 'UEs' in line:
+        elif any(x in line for x in ['Removed', 'removed', 'Released', 'released', 'delete', 'Delete']):
             event_type = 'session_end'
         else:
             return None
