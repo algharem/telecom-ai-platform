@@ -101,7 +101,7 @@ class AnomalyDetector:
         X = df_normalized[self.FEATURE_COLUMNS].copy()
         
         # Handle missing values (forward fill for time series)
-        X = X.fillna(method='ffill').fillna(method='bfill')
+        X = X.ffill().bfill()
         
         # Scale features (critical for telecom: different units)
         self.scaler = StandardScaler()

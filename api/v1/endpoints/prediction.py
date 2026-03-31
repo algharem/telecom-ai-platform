@@ -177,6 +177,124 @@ async def train_model(config: SimulationConfig = SimulationConfig()):
         raise HTTPException(status_code=500, detail=f"Training failed: {str(e)}")
 
 
+@router.post("/train/from-logs")
+async def train_from_logs(http_request: Request):
+    """
+    Train the anomaly detection model on real log data.
+    
+    Reads KPI records from real Open5GS logs (already parsed) and uses them
+    for model training. This provides more realistic training data than
+    synthetic data and calibrates anomaly detection to your actual network patterns.
+    
+    Returns:
+    - status: "success" or "error"
+    - records_used: Number of records used for training
+    - training_metrics: Model performance metrics
+    - data_statistics: Statistical breakdown of training data
+    - model_info: Updated model information
+    """
+    try:
+        provider = http_request.app.data_provider
+        
+        if not provider:
+            raise HTTPException(
+                status_code=503,
+                detail="Data provider not initialized"
+            )
+        
+        if not provider.is_available():
+            raise HTTPException(
+                status_code=400,
+                detail="No data available from provider. Load logs first."
+            )
+        
+        # Get all records from provider
+        all_records = []
+        batch_size = 1000
+        
+        # Reset position to get all records
+        original_pos = provider.current_position if hasattr(provider, 'current_position') else 0
+        if hasattr(provider, 'current_position'):
+            provider.current_position = 0
+        
+        # Fetch all available records
+        while True:
+            batch = provider.get_next_batch(batch_size)
+            if not batch:
+                break
+            all_records.extend(batch)
+            
+            if len(batch) < batch_size:
+                break
+        
+        if not all_records:
+            raise HTTPException(
+                status_code=400,
+                detail="No records available to train"
+            )
+        
+        logger.info(f"[TRAIN] Training model on {len(all_records)} real log records")
+        
+        # Convert KPIRecord objects to DataFrame
+        import pandas as pd
+        data = {
+            'prb_usage': [r.prb_usage for r in all_records],
+            'throughput': [r.throughput for r in all_records],
+            'latency': [r.latency for r in all_records],
+            'packet_loss': [r.packet_loss for r in all_records]
+        }
+        df = pd.DataFrame(data)
+        
+        logger.info(f"[TRAIN] DataFrame shape: {df.shape}")
+        logger.info(f"[TRAIN] Data statistics:\n{df.describe()}")
+        
+        # Train model on real data
+        metrics = ml_detector.train(df)
+        
+        # Reset provider position
+        if hasattr(provider, 'current_position'):
+            provider.current_position = original_pos
+        
+        return {
+            "status": "success",
+            "records_used": len(all_records),
+            "training_metrics": metrics,
+            "data_statistics": {
+                "prb_usage": {
+                    "mean": float(df['prb_usage'].mean()),
+                    "std": float(df['prb_usage'].std()),
+                    "min": float(df['prb_usage'].min()),
+                    "max": float(df['prb_usage'].max())
+                },
+                "throughput": {
+                    "mean": float(df['throughput'].mean()),
+                    "std": float(df['throughput'].std()),
+                    "min": float(df['throughput'].min()),
+                    "max": float(df['throughput'].max())
+                },
+                "latency": {
+                    "mean": float(df['latency'].mean()),
+                    "std": float(df['latency'].std()),
+                    "min": float(df['latency'].min()),
+                    "max": float(df['latency'].max())
+                },
+                "packet_loss": {
+                    "mean": float(df['packet_loss'].mean()),
+                    "std": float(df['packet_loss'].std()),
+                    "min": float(df['packet_loss'].min()),
+                    "max": float(df['packet_loss'].max())
+                }
+            },
+            "model_info": ml_detector.get_model_info()
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[TRAIN] Training from logs failed: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Training failed: {str(e)}")
+
+
 @router.post("/simulate/anomaly")
 async def simulate_anomaly_scenario(scenario: str = "congestion"):
     """
