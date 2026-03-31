@@ -276,3 +276,55 @@ async def get_aggregator_stats(request: Request) -> Dict[str, Any]:
         "total_metrics_added": stats["total_metrics_added"],
         "completed_pending": stats["completed_pending"]
     }
+
+
+@router.get("/data-source/status")
+async def get_data_source_status(request: Request) -> Dict[str, Any]:
+    """
+    Get data source status (alias for /data-source endpoint).
+    
+    Returns current data source configuration and availability.
+    """
+    provider = request.app.data_provider
+    
+    if not provider:
+        return {"error": "Data provider not initialized"}
+    
+    return {
+        "timestamp": datetime.now().isoformat(),
+        "available": provider.is_available(),
+        "source_info": provider.get_source_info()
+    }
+
+
+@router.get("/logs/status")
+async def get_logs_status(request: Request) -> Dict[str, Any]:
+    """
+    Get logs data source status.
+    
+    Returns:
+    - data_source: "logs" if using file-based source
+    - base_path: Directory being monitored
+    - watched_nfs: Network functions being parsed
+    - is_ready: Whether logs have been successfully loaded
+    - parse_rate_per_minute: Current parsing rate
+    - source_details: Full source metadata
+    """
+    provider = request.app.data_provider
+    monitor = request.app.pipeline_monitor
+    
+    if not provider:
+        return {"error": "Data provider not initialized"}
+    
+    source_info = provider.get_source_info()
+    
+    return {
+        "timestamp": datetime.now().isoformat(),
+        "data_source": source_info.get("type", "unknown"),
+        "base_path": source_info.get("base_path"),
+        "watched_nfs": source_info.get("watched_nfs", []),
+        "is_ready": source_info.get("is_ready", False),
+        "records_loaded": source_info.get("records_loaded", 0),
+        "parse_rate_per_minute": monitor.get_parse_rate_per_minute() if monitor else 0,
+        "source_details": source_info
+    }

@@ -353,8 +353,24 @@ def parse_open5gs_logs(log_dir: Path) -> List[Dict]:
         List of gNB KPI metric dictionaries
     """
     
+    # Validate directory exists
+    if not isinstance(log_dir, Path):
+        log_dir = Path(log_dir)
+    
+    logger.info(f"[PARSER] Starting log parsing from: {log_dir}")
+    logger.info(f"[PARSER] Directory exists: {log_dir.exists()}")
+    
+    if not log_dir.exists():
+        logger.warning(f"[PARSER] Log directory does not exist: {log_dir}")
+        return []
+    
+    if not log_dir.is_dir():
+        logger.warning(f"[PARSER] Path is not a directory: {log_dir}")
+        return []
+    
     parser = Open5GSRealLogParser()
     all_events = []
+    files_processed = 0
     
     # NF log file patterns
     nf_types = {
@@ -367,15 +383,42 @@ def parse_open5gs_logs(log_dir: Path) -> List[Dict]:
         'ausf*.log': 'ausf',
     }
     
+    # List all files in directory for debugging
+    try:
+        all_files = list(log_dir.glob('*.log'))
+        logger.info(f"[PARSER] Found {len(all_files)} .log files in {log_dir}")
+        for f in all_files[:5]:  # Log first 5 files
+            logger.info(f"[PARSER]   - {f.name}")
+    except Exception as e:
+        logger.error(f"[PARSER] Error listing directory: {e}")
+    
     # Process each log file
     for pattern, nf_type in nf_types.items():
-        for filepath in log_dir.glob(pattern):
-            logger.info(f"Parsing {filepath} as {nf_type}")
-            events = parser.process_file(filepath, nf_type)
-            all_events.extend(events)
-            logger.info(f"Extracted {len(events)} events from {filepath}")
+        try:
+            matching_files = list(log_dir.glob(pattern))
+            logger.info(f"[PARSER] Pattern '{pattern}': found {len(matching_files)} files")
+            
+            for filepath in matching_files:
+                logger.info(f"[PARSER] Parsing {filepath.name} as {nf_type}")
+                try:
+                    events = parser.process_file(filepath, nf_type)
+                    all_events.extend(events)
+                    files_processed += 1
+                    logger.info(f"[PARSER] Extracted {len(events)} events from {filepath.name}")
+                except Exception as e:
+                    logger.error(f"[PARSER] Error processing {filepath}: {e}")
+        except Exception as e:
+            logger.error(f"[PARSER] Error globbing pattern {pattern}: {e}")
+    
+    logger.info(f"[PARSER] Total events extracted: {len(all_events)} from {files_processed} files")
     
     # Aggregate to gNB KPI metrics
     kpi_metrics = parser.aggregate_to_gnb_kpi(all_events)
+    logger.info(f"[PARSER] Generated {len(kpi_metrics)} gNB KPI records")
+    
+    # Log generated gNB metrics
+    for gnb_id, metrics in kpi_metrics.items():
+        logger.info(f"[PARSER] {gnb_id}: throughput={metrics['throughput']} Mbps, "
+                   f"latency={metrics['latency']} ms, prb={metrics['prb_usage']}%")
     
     return list(kpi_metrics.values())
