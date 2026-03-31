@@ -26,26 +26,33 @@ class KPIMetrics(BaseModel):
         ..., 
         ge=0, 
         le=100, 
-        description="Physical Resource Block usage percentage (0-100%)"
+        description="Physical Resource Block usage percentage (0-100%)",
+        alias="prb_usage"
     )
     throughput: float = Field(
         ..., 
         ge=0, 
         le=10000, 
-        description="User plane throughput in Mbps"
+        description="User plane throughput in Mbps",
+        alias="throughput"
     )
     latency: float = Field(
         ..., 
         ge=0, 
         le=1000, 
-        description="Round-trip latency in milliseconds"
+        description="Round-trip latency in milliseconds",
+        alias="latency"
     )
     packet_loss: float = Field(
         ..., 
         ge=0, 
         le=100, 
-        description="Packet loss percentage"
+        description="Packet loss percentage",
+        alias="packet_loss"
     )
+    
+    class Config:
+        populate_by_name = True  # Allow both field name and alias
     
     @validator('prb_usage')
     def validate_prb_realistic(cls, v):

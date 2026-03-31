@@ -15,6 +15,7 @@ import logging
 from models.schemas import KPIMetrics, PredictionRequest
 from services.kpi_simulator import TelecomKPISimulator
 from parsers.open5gs_real_parser import parse_open5gs_logs
+from utils.gnb_utils import normalize_gnb_id
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -198,11 +199,12 @@ class LogFileDataProvider(DataProvider):
             kpi_dicts = parse_open5gs_logs(self.base_path)
             logger.info(f"[PROVIDER] Parsed logs returned {len(kpi_dicts)} gNB metrics")
             
-            # Convert to KPIRecord format
+            # Convert to KPIRecord format with normalized gNB IDs
             for kpi_dict in kpi_dicts:
+                normalized_gnb_id = normalize_gnb_id(kpi_dict['gnb_id'])
                 record = KPIRecord(
                     timestamp=datetime.fromisoformat(kpi_dict['timestamp']),
-                    gnb_id=kpi_dict['gnb_id'],
+                    gnb_id=normalized_gnb_id,
                     prb_usage=kpi_dict['prb_usage'],
                     throughput=kpi_dict['throughput'],
                     latency=kpi_dict['latency'],
