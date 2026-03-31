@@ -95,8 +95,9 @@ async def startup_event():
         data_source = os.getenv("DATA_SOURCE", "simulator").lower()
         logger.info(f"[STARTUP] Initializing data source: {data_source}")
         
-        # Create data provider
-        provider_config = get_provider_config(data_source)
+        # Create data provider with environment variables
+        provider_config = get_provider_config(data_source, dict(os.environ))
+        logger.info(f"[STARTUP] Provider config: {provider_config}")
         app.data_provider = create_data_provider(data_source, provider_config)
         logger.info(f"[STARTUP] Data provider initialized: {app.data_provider.get_source_info()}")
         
