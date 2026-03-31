@@ -4,6 +4,7 @@ from typing import List, Dict, Any
 import uuid
 from datetime import datetime
 import time
+import math
 
 from models.schemas import (
     PredictionRequest, 
@@ -25,6 +26,17 @@ router = APIRouter()
 # Global service instances (in production, use dependency injection)
 ml_detector = MLAnomalyDetector()  # For ML-based detection (requires training)
 simulator = TelecomKPISimulator()
+
+
+def _safe_float(value: float) -> float | None:
+    """Convert float to JSON-safe value, handling NaN and Inf"""
+    if value is None:
+        return None
+    if math.isnan(value):
+        return None
+    if math.isinf(value):
+        return None
+    return float(value)
 
 
 @router.post("/predict", response_model=PredictionResponse)
@@ -261,28 +273,28 @@ async def train_from_logs(http_request: Request):
             "training_metrics": metrics,
             "data_statistics": {
                 "prb_usage": {
-                    "mean": float(df['prb_usage'].mean()),
-                    "std": float(df['prb_usage'].std()),
-                    "min": float(df['prb_usage'].min()),
-                    "max": float(df['prb_usage'].max())
+                    "mean": _safe_float(df['prb_usage'].mean()),
+                    "std": _safe_float(df['prb_usage'].std()),
+                    "min": _safe_float(df['prb_usage'].min()),
+                    "max": _safe_float(df['prb_usage'].max())
                 },
                 "throughput": {
-                    "mean": float(df['throughput'].mean()),
-                    "std": float(df['throughput'].std()),
-                    "min": float(df['throughput'].min()),
-                    "max": float(df['throughput'].max())
+                    "mean": _safe_float(df['throughput'].mean()),
+                    "std": _safe_float(df['throughput'].std()),
+                    "min": _safe_float(df['throughput'].min()),
+                    "max": _safe_float(df['throughput'].max())
                 },
                 "latency": {
-                    "mean": float(df['latency'].mean()),
-                    "std": float(df['latency'].std()),
-                    "min": float(df['latency'].min()),
-                    "max": float(df['latency'].max())
+                    "mean": _safe_float(df['latency'].mean()),
+                    "std": _safe_float(df['latency'].std()),
+                    "min": _safe_float(df['latency'].min()),
+                    "max": _safe_float(df['latency'].max())
                 },
                 "packet_loss": {
-                    "mean": float(df['packet_loss'].mean()),
-                    "std": float(df['packet_loss'].std()),
-                    "min": float(df['packet_loss'].min()),
-                    "max": float(df['packet_loss'].max())
+                    "mean": _safe_float(df['packet_loss'].mean()),
+                    "std": _safe_float(df['packet_loss'].std()),
+                    "min": _safe_float(df['packet_loss'].min()),
+                    "max": _safe_float(df['packet_loss'].max())
                 }
             },
             "model_info": ml_detector.get_model_info()
