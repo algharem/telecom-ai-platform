@@ -183,20 +183,68 @@ class PrometheusDataProvider(DataProvider):
         self.is_ready = False
         self.last_fetch_time = None
         
-        # Metric mappings
+        # Gauge metrics (current state) - from actual Open5GS deployment
         self.gauge_metrics = {
-            'fivegs_amffunction_rm_registeredsubnbr': 'registered_ues',
-            'fivegs_smffunction_sm_sessionnbr': 'pdu_sessions',
+            # AMF subscription metrics
+            'fivegs_amffunction_rm_registeredsubnbr': 'amf_registered_ues',
+            # SMF session metrics
+            'fivegs_smffunction_sm_sessionnbr': 'smf_pdu_sessions',
+            'fivegs_smffunction_sm_qos_flow_nbr': 'smf_qos_flows',
+            # UPF metrics
             'fivegs_upffunction_upf_sessionnbr': 'upf_sessions',
-            'fivegs_smffunction_sm_qos_flow_nbr': 'qos_flows',
+            'fivegs_upffunction_upf_qosflows': 'upf_qos_flows',
+            # PCF metrics
+            'fivegs_pcffunction_pa_sessionnbr': 'pcf_sessions',
+            # System metrics
+            'ues_active': 'total_ues_active',
+            'bearers_active': 'total_bearers_active',
         }
         
+        # Counter metrics (with rate calculation over 5-minute window)
         self.rate_metrics = {
+            # AMF Registration metrics
+            'fivegs_amffunction_rm_reginitreq': 'amf_reg_init_req',
+            'fivegs_amffunction_rm_reginitsucc': 'amf_reg_init_succ',
+            'fivegs_amffunction_rm_reginitfail': 'amf_reg_init_fail',
+            'fivegs_amffunction_rm_regmobreq': 'amf_reg_mobility_req',
+            'fivegs_amffunction_rm_regmobsucc': 'amf_reg_mobility_succ',
+            'fivegs_amffunction_rm_regperiodreq': 'amf_reg_periodic_req',
+            'fivegs_amffunction_rm_regperiodsucc': 'amf_reg_periodic_succ',
+            # AMF Emergency registration
+            'fivegs_amffunction_rm_regemergreq': 'amf_reg_emergency_req',
+            'fivegs_amffunction_rm_regemergsucc': 'amf_reg_emergency_succ',
+            # AMF Authentication metrics
+            'fivegs_amffunction_amf_authreq': 'amf_auth_req',
+            'fivegs_amffunction_amf_authfail': 'amf_auth_fail',
+            'fivegs_amffunction_amf_authreject': 'amf_auth_reject',
+            # AMF Paging metrics
+            'fivegs_amffunction_mm_paging5greq': 'amf_paging_req',
+            'fivegs_amffunction_mm_paging5gsucc': 'amf_paging_succ',
+            # AMF Configuration update
+            'fivegs_amffunction_mm_confupdate': 'amf_conf_update_req',
+            'fivegs_amffunction_mm_confupdatesucc': 'amf_conf_update_succ',
+            # SMF PDU session metrics
+            'fivegs_smffunction_sm_pdusessioncreationreq': 'smf_pdu_create_req',
+            'fivegs_smffunction_sm_pdusessioncreationsucc': 'smf_pdu_create_succ',
+            'fivegs_smffunction_sm_n4sessionestabreq': 'smf_n4_estab_req',
+            'fivegs_smffunction_sm_n4sessionreport': 'smf_n4_report',
+            'fivegs_smffunction_sm_n4sessionreportsucc': 'smf_n4_report_succ',
+            # UPF N4 metrics
+            'fivegs_upffunction_sm_n4sessionestabreq': 'upf_n4_estab_req',
+            'fivegs_upffunction_sm_n4sessionreport': 'upf_n4_report',
+            'fivegs_upffunction_sm_n4sessionreportsucc': 'upf_n4_report_succ',
+            # Data plane metrics (N3 interface)
             'fivegs_ep_n3_gtp_indatapktn3upf': 'n3_in_packets',
             'fivegs_ep_n3_gtp_outdatapktn3upf': 'n3_out_packets',
-            'fivegs_amffunction_amf_authfail': 'auth_fails',
-            'fivegs_amffunction_amf_authreq': 'auth_requests',
-            'fivegs_amffunction_rm_reginitsucc': 'reg_success',
+            # PCF policy metrics
+            'fivegs_pcffunction_pa_policyamassoreq': 'pcf_am_policy_req',
+            'fivegs_pcffunction_pa_policyamassosucc': 'pcf_am_policy_succ',
+            'fivegs_pcffunction_pa_policysmassoreq': 'pcf_sm_policy_req',
+            'fivegs_pcffunction_pa_policysmassosucc': 'pcf_sm_policy_succ',
+            # GTP/PFCP metrics
+            'gtp2_sessions_active': 'gtp2_sessions',
+            'pfcp_sessions_active': 'pfcp_sessions',
+            'pfcp_peers_active': 'pfcp_peers',
         }
         
         # Test connection
@@ -251,30 +299,55 @@ class PrometheusDataProvider(DataProvider):
     def _derive_kpis(self, metrics: Dict[str, float]) -> Dict[str, float]:
         """Derive RAN-level KPIs from core network metrics"""
         
-        registered_ues = metrics.get('registered_ues', 0)
-        pdu_sessions = metrics.get('pdu_sessions', 0)
-        auth_requests = metrics.get('auth_requests', 1)
-        auth_fails = metrics.get('auth_fails', 0)
+        # Extract metrics with safe defaults
+        registered_ues = metrics.get('amf_registered_ues', 0)
+        pdu_sessions = metrics.get('smf_pdu_sessions', 0)
+        upf_sessions = metrics.get('upf_sessions', 0)
+        qos_flows = metrics.get('smf_qos_flows', 0)
+        active_ues = metrics.get('total_ues_active', registered_ues)
+        active_bearers = metrics.get('total_bearers_active', 0)
         
-        # Calculate auth failure rate
-        auth_fail_rate = auth_fails / max(auth_requests, 1)
+        # Registration metrics
+        reg_init_req = metrics.get('amf_reg_init_req', 1)
+        reg_init_succ = metrics.get('amf_reg_init_succ', 0)
+        reg_init_fail = metrics.get('amf_reg_init_fail', 0)
         
-        # PRB usage derivation
+        # Authentication metrics
+        auth_req = metrics.get('amf_auth_req', 1)
+        auth_fail = metrics.get('amf_auth_fail', 0)
+        auth_reject = metrics.get('amf_auth_reject', 0)
+        
+        # Data plane metrics
+        n3_in_packets = metrics.get('n3_in_packets', 0)
+        n3_out_packets = metrics.get('n3_out_packets', 0)
+        
+        # Calculate derived rates
+        reg_success_rate = reg_init_succ / max(reg_init_req, 1)
+        reg_failure_rate = reg_init_fail / max(reg_init_req, 1)
+        auth_failure_rate = auth_fail / max(auth_req, 1)
+        auth_reject_rate = auth_reject / max(auth_req, 1)
+        
+        # PRB usage derivation (based on active sessions and UEs)
         prb_base = self.derivation_config.get('prb_base', 20.0)
         prb_per_ue = self.derivation_config.get('prb_per_ue', 15.0)
-        prb_usage = min(100.0, prb_base + registered_ues * prb_per_ue)
+        prb_usage = min(100.0, prb_base + active_ues * prb_per_ue)
         
-        # Throughput derivation
+        # Throughput derivation (based on active sessions and packet rates)
         mbps_per_session = self.derivation_config.get('mbps_per_session', 5.0)
         throughput = pdu_sessions * mbps_per_session
+        # Scale with packet rates if available
+        if n3_in_packets > 0 or n3_out_packets > 0:
+            avg_packet_rate = (n3_in_packets + n3_out_packets) / 2.0
+            throughput = max(throughput, avg_packet_rate / 1000.0)  # Estimate Mbps from packet rate
         
-        # Latency derivation
+        # Latency derivation - increases with registration/auth failures
         latency_base = self.derivation_config.get('latency_base_ms', 20.0)
         latency_penalty = self.derivation_config.get('latency_penalty_ms', 100.0)
-        latency = latency_base + auth_fail_rate * latency_penalty
+        failure_impact = reg_failure_rate + auth_failure_rate + auth_reject_rate
+        latency = latency_base + (failure_impact * latency_penalty)
         
-        # Packet loss from auth failures
-        packet_loss = auth_fail_rate * 100.0
+        # Packet loss - from auth/registration failures and rejection rates
+        packet_loss = (auth_failure_rate + auth_reject_rate + reg_failure_rate) * 100.0
         
         return {
             'prb_usage': round(min(prb_usage, 100.0), 2),

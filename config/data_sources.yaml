@@ -27,19 +27,78 @@ prometheus:
     # Latency penalty per unit auth failure rate (ms)
     latency_penalty_ms: 100.0
   
-  # Metrics to monitor
+  # Gauge metrics (current state) from actual Open5GS Prometheus deployment
   gauge_metrics:
-    - fivegs_amffunction_rm_registeredsubnbr
-    - fivegs_smffunction_sm_sessionnbr
-    - fivegs_upffunction_upf_sessionnbr
-    - fivegs_smffunction_sm_qos_flow_nbr
+    # AMF subscription metrics
+    - fivegs_amffunction_rm_registeredsubnbr      # Registered subscribers
+    # SMF session metrics
+    - fivegs_smffunction_sm_sessionnbr            # PDU sessions
+    - fivegs_smffunction_sm_qos_flow_nbr          # QoS flows
+    # UPF metrics
+    - fivegs_upffunction_upf_sessionnbr           # UPF active sessions
+    - fivegs_upffunction_upf_qosflows             # UPF QoS flows
+    # PCF metrics
+    - fivegs_pcffunction_pa_sessionnbr            # PCF active sessions
+    # System metrics
+    - ues_active                                  # Total active UEs
+    - bearers_active                              # Total active bearers
+    - gtp2_sessions_active                        # Active GTP2 sessions
+    - pfcp_sessions_active                        # Active PFCP sessions
+    - pfcp_peers_active                           # Active PFCP peers
   
+  # Rate metrics (counters - calculate rates over 5m window)
   rate_metrics:
-    - fivegs_ep_n3_gtp_indatapktn3upf
-    - fivegs_ep_n3_gtp_outdatapktn3upf
-    - fivegs_amffunction_amf_authfail
-    - fivegs_amffunction_amf_authreq
-    - fivegs_amffunction_rm_reginitsucc
+    # AMF Registration metrics
+    - fivegs_amffunction_rm_reginitreq            # Registration initiation requests
+    - fivegs_amffunction_rm_reginitsucc           # Registration initiation success
+    - fivegs_amffunction_rm_reginitfail           # Registration initiation failure
+    - fivegs_amffunction_rm_regmobreq             # Registration mobility requests
+    - fivegs_amffunction_rm_regmobsucc            # Registration mobility success
+    - fivegs_amffunction_rm_regperiodreq          # Registration periodic requests
+    - fivegs_amffunction_rm_regperiodsucc         # Registration periodic success
+    - fivegs_amffunction_rm_regemergreq           # Emergency registration requests
+    - fivegs_amffunction_rm_regemergsucc          # Emergency registration success
+    
+    # AMF Authentication metrics
+    - fivegs_amffunction_amf_authreq              # Authentication requests
+    - fivegs_amffunction_amf_authfail             # Authentication failures
+    - fivegs_amffunction_amf_authreject           # Authentication rejects
+    
+    # AMF Paging metrics
+    - fivegs_amffunction_mm_paging5greq           # 5G paging requests
+    - fivegs_amffunction_mm_paging5gsucc          # 5G paging success
+    
+    # AMF Configuration update
+    - fivegs_amffunction_mm_confupdate            # Configuration update requests
+    - fivegs_amffunction_mm_confupdatesucc        # Configuration update success
+    
+    # SMF PDU Session metrics
+    - fivegs_smffunction_sm_pdusessioncreationreq   # PDU session creation requests
+    - fivegs_smffunction_sm_pdusessioncreationsucc  # PDU session creation success
+    - fivegs_smffunction_sm_n4sessionestabreq       # SMF N4 session establishment
+    - fivegs_smffunction_sm_n4sessionreport         # SMF N4 session reports
+    - fivegs_smffunction_sm_n4sessionreportsucc     # SMF N4 session report success
+    
+    # UPF N4 metrics
+    - fivegs_upffunction_sm_n4sessionestabreq       # UPF N4 session establishment
+    - fivegs_upffunction_sm_n4sessionreport         # UPF N4 session reports
+    - fivegs_upffunction_sm_n4sessionreportsucc     # UPF N4 session report success
+    
+    # Data Plane (N3 interface)
+    - fivegs_ep_n3_gtp_indatapktn3upf            # N3 inbound data packets
+    - fivegs_ep_n3_gtp_outdatapktn3upf           # N3 outbound data packets
+    
+    # PCF Policy metrics
+    - fivegs_pcffunction_pa_policyamassoreq      # PCF AM policy requests
+    - fivegs_pcffunction_pa_policyamassosucc     # PCF AM policy success
+    - fivegs_pcffunction_pa_policysmassoreq      # PCF SM policy requests
+    - fivegs_pcffunction_pa_policysmassosucc     # PCF SM policy success
+    
+    # GTP/PFCP protocol metrics
+    - gn_rx_createpdpcontextreq                  # Create PDP context requests (4G)
+    - gn_rx_deletepdpcontextreq                  # Delete PDP context requests (4G)
+    - s5c_rx_createsession                       # Create session requests (4G)
+    - s5c_rx_deletesession                       # Delete session requests (4G)
 
 # Simulator configuration (used when data_source: simulator)
 simulator:
