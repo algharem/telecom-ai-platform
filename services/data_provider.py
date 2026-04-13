@@ -162,6 +162,184 @@ class SimulatorDataProvider(DataProvider):
         self.generated_data = None
 
 
+class PrometheusDataProvider(DataProvider):
+    """
+    Data provider fetching live metrics from Prometheus.
+    
+    Queries Prometheus for Open5GS metrics and derives RAN-level KPIs.
+    Provides real-time monitoring without file parsing overhead.
+    """
+    
+    def __init__(self, config: Dict[str, Any]):
+        from services.prometheus_client import PrometheusClient
+        
+        self.config = config
+        self.prometheus_url = config.get("prometheus_url", "http://172.25.0.36:9090")
+        self.gnb_id = config.get("gnb_id", "gNB-001")
+        self.derivation_config = config.get("derivation", {})
+        
+        # Initialize Prometheus client
+        self.client = PrometheusClient(base_url=self.prometheus_url)
+        self.is_ready = False
+        self.last_fetch_time = None
+        
+        # Metric mappings
+        self.gauge_metrics = {
+            'fivegs_amffunction_rm_registeredsubnbr': 'registered_ues',
+            'fivegs_smffunction_sm_sessionnbr': 'pdu_sessions',
+            'fivegs_upffunction_upf_sessionnbr': 'upf_sessions',
+            'fivegs_smffunction_sm_qos_flow_nbr': 'qos_flows',
+        }
+        
+        self.rate_metrics = {
+            'fivegs_ep_n3_gtp_indatapktn3upf': 'n3_in_packets',
+            'fivegs_ep_n3_gtp_outdatapktn3upf': 'n3_out_packets',
+            'fivegs_amffunction_amf_authfail': 'auth_fails',
+            'fivegs_amffunction_amf_authreq': 'auth_requests',
+            'fivegs_amffunction_rm_reginitsucc': 'reg_success',
+        }
+        
+        # Test connection
+        self._test_connection()
+        logger.info("[PROVIDER] PrometheusDataProvider initialized")
+    
+    def _test_connection(self):
+        """Test Prometheus connectivity and Open5GS metrics availability"""
+        try:
+            if not self.client.is_available():
+                logger.warning(f"[PROVIDER] Cannot connect to Prometheus at {self.prometheus_url}")
+                return
+            
+            if self.client.test_open5gs_metrics():
+                self.is_ready = True
+                logger.info("[PROVIDER] Prometheus connected with Open5GS metrics")
+            else:
+                logger.warning("[PROVIDER] Prometheus available but Open5GS metrics not found")
+                
+        except Exception as e:
+            logger.error(f"[PROVIDER] Connection test failed: {e}")
+    
+    def _fetch_gauge_metrics(self) -> Dict[str, float]:
+        """Fetch gauge metrics (current values)"""
+        results = {}
+        
+        for prom_metric, internal_name in self.gauge_metrics.items():
+            try:
+                value = self.client.get_query_value(prom_metric)
+                if value is not None:
+                    results[internal_name] = value
+            except Exception as e:
+                logger.debug(f"[PROVIDER] Error fetching {prom_metric}: {e}")
+        
+        return results
+    
+    def _fetch_rate_metrics(self) -> Dict[str, float]:
+        """Fetch rate metrics (5-minute rate)"""
+        results = {}
+        
+        for prom_metric, internal_name in self.rate_metrics.items():
+            try:
+                query = f"rate({prom_metric}[5m])"
+                value = self.client.get_query_value(query)
+                if value is not None:
+                    results[internal_name] = value
+            except Exception as e:
+                logger.debug(f"[PROVIDER] Error fetching rate for {prom_metric}: {e}")
+        
+        return results
+    
+    def _derive_kpis(self, metrics: Dict[str, float]) -> Dict[str, float]:
+        """Derive RAN-level KPIs from core network metrics"""
+        
+        registered_ues = metrics.get('registered_ues', 0)
+        pdu_sessions = metrics.get('pdu_sessions', 0)
+        auth_requests = metrics.get('auth_requests', 1)
+        auth_fails = metrics.get('auth_fails', 0)
+        
+        # Calculate auth failure rate
+        auth_fail_rate = auth_fails / max(auth_requests, 1)
+        
+        # PRB usage derivation
+        prb_base = self.derivation_config.get('prb_base', 20.0)
+        prb_per_ue = self.derivation_config.get('prb_per_ue', 15.0)
+        prb_usage = min(100.0, prb_base + registered_ues * prb_per_ue)
+        
+        # Throughput derivation
+        mbps_per_session = self.derivation_config.get('mbps_per_session', 5.0)
+        throughput = pdu_sessions * mbps_per_session
+        
+        # Latency derivation
+        latency_base = self.derivation_config.get('latency_base_ms', 20.0)
+        latency_penalty = self.derivation_config.get('latency_penalty_ms', 100.0)
+        latency = latency_base + auth_fail_rate * latency_penalty
+        
+        # Packet loss from auth failures
+        packet_loss = auth_fail_rate * 100.0
+        
+        return {
+            'prb_usage': round(min(prb_usage, 100.0), 2),
+            'throughput': round(throughput, 2),
+            'latency': round(min(latency, 100.0), 2),
+            'packet_loss': round(min(packet_loss, 100.0), 2)
+        }
+    
+    def get_next_batch(self, limit: int = 100) -> List[KPIRecord]:
+        """Fetch current metrics from Prometheus and return as KPIRecord"""
+        
+        if not self.is_ready:
+            logger.warning("[PROVIDER] Prometheus not ready")
+            return []
+        
+        try:
+            # Fetch all metrics
+            gauge_metrics = self._fetch_gauge_metrics()
+            rate_metrics = self._fetch_rate_metrics()
+            all_metrics = {**gauge_metrics, **rate_metrics}
+            
+            logger.debug(f"[PROVIDER] Fetched metrics: {all_metrics}")
+            
+            # Derive RAN KPIs
+            kpis = self._derive_kpis(all_metrics)
+            
+            # Create KPIRecord (Prometheus gives snapshot, so 1 record)
+            record = KPIRecord(
+                timestamp=datetime.utcnow(),
+                gnb_id=self.gnb_id,
+                prb_usage=kpis['prb_usage'],
+                throughput=kpis['throughput'],
+                latency=kpis['latency'],
+                packet_loss=kpis['packet_loss'],
+                source="prometheus"
+            )
+            
+            self.last_fetch_time = datetime.utcnow()
+            return [record]
+            
+        except Exception as e:
+            logger.error(f"[PROVIDER] Error fetching Prometheus metrics: {e}")
+            return []
+    
+    def is_available(self) -> bool:
+        """Check if Prometheus is ready"""
+        return self.is_ready
+    
+    def get_source_info(self) -> Dict[str, Any]:
+        """Return Prometheus source metadata"""
+        return {
+            "type": "prometheus",
+            "url": self.prometheus_url,
+            "gnb_id": self.gnb_id,
+            "is_ready": self.is_ready,
+            "last_fetch": self.last_fetch_time.isoformat() if self.last_fetch_time else None,
+            "gauge_metrics": list(self.gauge_metrics.keys()),
+            "rate_metrics": list(self.rate_metrics.keys())
+        }
+    
+    def close(self):
+        """Cleanup"""
+        self.is_ready = False
+
+
 class LogFileDataProvider(DataProvider):
     """
     Data provider reading from real Open5GS log files.
@@ -266,7 +444,7 @@ def create_data_provider(source_type: str, config: Dict[str, Any]) -> DataProvid
     Factory function to create appropriate data provider.
     
     Args:
-        source_type: "simulator" or "logs"
+        source_type: "prometheus", "simulator", or "logs"
         config: Configuration dict for the provider
         
     Returns:
@@ -277,12 +455,14 @@ def create_data_provider(source_type: str, config: Dict[str, Any]) -> DataProvid
     """
     source_type = source_type.lower().strip()
     
-    if source_type == "simulator":
+    if source_type == "prometheus":
+        return PrometheusDataProvider(config)
+    elif source_type == "simulator":
         return SimulatorDataProvider(config)
     elif source_type == "logs":
         return LogFileDataProvider(config)
     else:
-        raise ValueError(f"Unknown data source type: {source_type}. Use 'simulator' or 'logs'")
+        raise ValueError(f"Unknown data source type: {source_type}. Use 'prometheus', 'simulator', or 'logs'")
 
 
 def get_provider_config(source_type: str, env_config: Optional[Dict] = None) -> Dict[str, Any]:
@@ -290,7 +470,7 @@ def get_provider_config(source_type: str, env_config: Optional[Dict] = None) -> 
     Build provider config from environment or defaults.
     
     Args:
-        source_type: "simulator" or "logs"
+        source_type: "prometheus", "simulator", or "logs"
         env_config: Optional config from environment/settings
         
     Returns:
@@ -298,7 +478,19 @@ def get_provider_config(source_type: str, env_config: Optional[Dict] = None) -> 
     """
     env_config = env_config or {}
     
-    if source_type == "simulator":
+    if source_type == "prometheus":
+        return {
+            "prometheus_url": env_config.get("PROMETHEUS_URL", "http://172.25.0.36:9090"),
+            "gnb_id": env_config.get("GNB_ID", "gNB-001"),
+            "derivation": {
+                "prb_base": float(env_config.get("PRB_BASE", 20.0)),
+                "prb_per_ue": float(env_config.get("PRB_PER_UE", 15.0)),
+                "mbps_per_session": float(env_config.get("MBPS_PER_SESSION", 5.0)),
+                "latency_base_ms": float(env_config.get("LATENCY_BASE_MS", 20.0)),
+                "latency_penalty_ms": float(env_config.get("LATENCY_PENALTY_MS", 100.0))
+            }
+        }
+    elif source_type == "simulator":
         return {
             "base_stations": env_config.get("SIMULATOR_BASE_STATIONS", 10),
             "random_seed": env_config.get("SIMULATOR_RANDOM_SEED", 42),

@@ -1,8 +1,45 @@
 # Data Source Configuration
-# Switch between simulator and real log sources
+# Switch between prometheus, simulator, and log sources
 
-# Active data source: "simulator" or "logs"
+# Active data source: "prometheus", "simulator", or "logs"
 data_source: "simulator"
+
+# Prometheus configuration (used when data_source: prometheus)
+prometheus:
+  enabled: false
+  url: "http://172.25.0.36:9090"
+  gnb_id: "gNB-001"
+  
+  # KPI derivation parameters (map core metrics to RAN KPIs)
+  derivation:
+    # Base PRB usage percentage
+    prb_base: 20.0
+    
+    # Additional PRB % per registered UE
+    prb_per_ue: 15.0
+    
+    # Estimated throughput per PDU session (Mbps)
+    mbps_per_session: 5.0
+    
+    # Base latency in milliseconds
+    latency_base_ms: 20.0
+    
+    # Latency penalty per unit auth failure rate (ms)
+    latency_penalty_ms: 100.0
+  
+  # Metrics to monitor
+  gauge_metrics:
+    - fivegs_amffunction_rm_registeredsubnbr
+    - fivegs_smffunction_sm_sessionnbr
+    - fivegs_upffunction_upf_sessionnbr
+    - fivegs_smffunction_sm_qos_flow_nbr
+  
+  rate_metrics:
+    - fivegs_ep_n3_gtp_indatapktn3upf
+    - fivegs_ep_n3_gtp_outdatapktn3upf
+    - fivegs_amffunction_amf_authfail
+    - fivegs_amffunction_amf_authreq
+    - fivegs_amffunction_rm_reginitsucc
 
 # Simulator configuration (used when data_source: simulator)
 simulator:
