@@ -66,11 +66,14 @@ class KPIMetrics(BaseModel):
 
 
 class PredictionRequest(BaseModel):
-    """Input for anomaly prediction"""
+    """Input for anomaly prediction - metrics can be omitted to auto-fetch from data source"""
     gnb_id: str = Field(..., description="gNB identifier (e.g., gNB_001)")
     cell_id: Optional[str] = Field(None, description="Cell ID within gNB")
     timestamp: Optional[datetime] = Field(default_factory=datetime.utcnow)
-    metrics: KPIMetrics
+    metrics: Optional[KPIMetrics] = Field(
+        None, 
+        description="KPI metrics (optional - if omitted, fetched from configured data source like Prometheus)"
+    )
     network_type: NetworkElementType = NetworkElementType.GNB
     
     class Config:
@@ -84,6 +87,10 @@ class PredictionRequest(BaseModel):
                     "latency": 25.0,
                     "packet_loss": 0.1
                 }
+            },
+            "example_with_auto_fetch": {
+                "gnb_id": "gNB_001",
+                "description": "Metrics will be auto-fetched from Prometheus"
             }
         }
 

@@ -11,7 +11,9 @@ from models.schemas import (
     PredictionResponse, 
     AnomalyResult,
     SimulationConfig,
-    HealthStatus
+    HealthStatus,
+    KPIMetrics,
+    KPIRecord
 )
 from services.ml_detector import AnomalyDetector as MLAnomalyDetector
 from services.anomaly_detector import AnomalyDetector as PatternAnomalyDetector
@@ -48,6 +50,7 @@ async def predict_anomaly(
     """
     Predict anomaly for a single gNB KPI measurement.
     
+    Metrics can be provided explicitly OR auto-fetched from configured data source (Prometheus/simulator/logs).
     This endpoint mimics NWDAF's "Nnwdaf_AnalyticsInfo" service operation.
     In 5G Core, AMF/SMF would call this to get network analytics.
     
@@ -57,24 +60,59 @@ async def predict_anomaly(
     start_time = time.time()
     
     try:
+        # If metrics not provided, fetch from data provider
+        metrics_to_use = request.metrics
+        fetch_source = "request"
+        
+        if metrics_to_use is None:
+            logger.info(f"[PREDICT] Metrics not provided, fetching from data provider for {request.gnb_id}")
+            provider = http_request.app.data_provider
+            
+            if not provider:
+                raise HTTPException(
+                    status_code=503,
+                    detail="Metrics not provided and no data provider available"
+                )
+            
+            # Fetch from provider
+            batch = provider.get_next_batch(limit=1)
+            if not batch:
+                raise HTTPException(
+                    status_code=503,
+                    detail="Could not fetch metrics from data provider"
+                )
+            
+            # Convert KPIRecord to KPIMetrics
+            kpi_record = batch[0]
+            metrics_to_use = KPIMetrics(
+                prb_usage=kpi_record.prb_usage,
+                throughput=kpi_record.throughput,
+                latency=kpi_record.latency,
+                packet_loss=kpi_record.packet_loss
+            )
+            fetch_source = f"data_provider ({provider.get_source_info().get('type', 'unknown')})"
+            logger.info(f"[PREDICT] Fetched metrics from {fetch_source}")
+        
         # Try ML-based detection first if available
         if ml_detector.is_trained:
-            result = ml_detector.predict(request)
+            # Create modified request with metrics for ML prediction
+            ml_request = request.copy(update={"metrics": metrics_to_use})
+            result = ml_detector.predict(ml_request)
             detection_method = "ml"
         else:
             # Fall back to pattern-based detection (no training required)
             pattern_detector = http_request.app.anomaly_detector
             if pattern_detector:
-                # Create KPI record from request for pattern detection
+                # Create KPI record from metrics for pattern detection
                 from models.schemas import KPIRecord
                 kpi = KPIRecord(
                     timestamp=datetime.utcnow(),
                     gnb_id=request.gnb_id,
-                    prb_usage=request.metrics.prb_usage,
-                    throughput=request.metrics.throughput_mbps,
-                    latency=request.metrics.latency_ms,
-                    packet_loss=request.metrics.packet_loss_percent,
-                    source="api"
+                    prb_usage=metrics_to_use.prb_usage,
+                    throughput=metrics_to_use.throughput,
+                    latency=metrics_to_use.latency,
+                    packet_loss=metrics_to_use.packet_loss,
+                    source=fetch_source
                 )
                 is_anomaly, reason = pattern_detector.detect(kpi)
                 
@@ -90,7 +128,7 @@ async def predict_anomaly(
                 raise TelecomAIException("No anomaly detector available", "DETECTOR_NOT_INIT")
         
         # Determine recommended action (SON-style automation)
-        action = _determine_action(result, request.metrics)
+        action = _determine_action(result, metrics_to_use)
         
         processing_time = (time.time() - start_time) * 1000
         
@@ -98,7 +136,7 @@ async def predict_anomaly(
             prediction_id=str(uuid.uuid4()),
             gnb_id=request.gnb_id,
             timestamp=datetime.utcnow(),
-            metrics=request.metrics,
+            metrics=metrics_to_use,
             result=result,
             recommended_action=action,
             processing_time_ms=processing_time
@@ -109,6 +147,8 @@ async def predict_anomaly(
         
         return response
         
+    except HTTPException:
+        raise
     except ModelNotTrainedException as e:
         logger.error(f"Model not trained: {e.message}")
         raise HTTPException(
@@ -124,7 +164,7 @@ async def predict_anomaly(
         raise HTTPException(status_code=400, detail=e.message)
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal processing error")
+        raise HTTPException(status_code=500, detail=f"Internal processing error: {str(e)}")
 
 
 @router.post("/predict/batch", response_model=List[PredictionResponse])
