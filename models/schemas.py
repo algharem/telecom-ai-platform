@@ -21,30 +21,31 @@ class KPIMetrics(BaseModel):
     """
     3GPP-compliant RAN KPI metrics.
     These map to 3GPP TS 28.552 (5G performance measurements).
+    All fields are optional to support auto-fetching from data sources.
     """
-    prb_usage: float = Field(
-        ..., 
+    prb_usage: Optional[float] = Field(
+        None, 
         ge=0, 
         le=100, 
         description="Physical Resource Block usage percentage (0-100%)",
         alias="prb_usage"
     )
-    throughput: float = Field(
-        ..., 
+    throughput: Optional[float] = Field(
+        None, 
         ge=0, 
         le=10000, 
         description="User plane throughput in Mbps",
         alias="throughput"
     )
-    latency: float = Field(
-        ..., 
+    latency: Optional[float] = Field(
+        None, 
         ge=0, 
         le=1000, 
         description="Round-trip latency in milliseconds",
         alias="latency"
     )
-    packet_loss: float = Field(
-        ..., 
+    packet_loss: Optional[float] = Field(
+        None, 
         ge=0, 
         le=100, 
         description="Packet loss percentage",
