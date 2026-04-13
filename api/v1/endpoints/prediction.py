@@ -12,8 +12,7 @@ from models.schemas import (
     AnomalyResult,
     SimulationConfig,
     HealthStatus,
-    KPIMetrics,
-    KPIRecord
+    KPIMetrics
 )
 from services.ml_detector import AnomalyDetector as MLAnomalyDetector
 from services.anomaly_detector import AnomalyDetector as PatternAnomalyDetector
@@ -104,7 +103,7 @@ async def predict_anomaly(
             pattern_detector = http_request.app.anomaly_detector
             if pattern_detector:
                 # Create KPI record from metrics for pattern detection
-                from models.schemas import KPIRecord
+                from services.data_provider import KPIRecord
                 kpi = KPIRecord(
                     timestamp=datetime.utcnow(),
                     gnb_id=request.gnb_id,
