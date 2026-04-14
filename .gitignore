@@ -1,5 +1,60 @@
-```
-# Test directories
-tests/__pycache__/
+```gitignore
+# Python cache files
+__pycache__/
 *.pyc
+*.pyo
+*.pyd
+
+# Test cache
+.pytest_cache/
+
+# Logs
+*.log
+
+# Environment files
+.env
+.env.local
+*.env.*
+
+# Dependencies
+.venv/
+venv/
+pip-log.txt
+pip-selfcheck.json
+
+# Coverage reports
+.coverage
+htmlcov/
+.coverage.*
+.nyc_output
+istanbul.out
+
+# IDE specific
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Build outputs
+dist/
+build/
+*.egg-info/
+.tox/
+.coverage*
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+
+# OS generated
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 ```
