@@ -1,55 +1,173 @@
-```gitignore
-# Python cache files
+# Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# Test cache
-.pytest_cache/
+# Virtual environments
+venv/
+ENV/
+env.bak/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
 
 # Logs
 *.log
 
-# Environment files
+# Environment variables
 .env
 .env.local
 *.env.*
-
-# Dependencies
-.venv/
-venv/
-pip-log.txt
-pip-selfcheck.json
 
 # Coverage reports
 .coverage
 htmlcov/
 .coverage.*
-.nyc_output
-istanbul.out
+.cache
+.pytest_cache/
+.mypy_cache/
 
-# IDE specific
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
-Thumbs.db
-
-# Build outputs
-dist/
+# Distribution / packaging
+.Python
 build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
 *.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
 .tox/
+.nox/
 .coverage*
+.coverage
+.cache
 nosetests.xml
 coverage.xml
 *.cover
-*.log
+*.py,cover
+.hypothesis/
+.pytest_cache/
 
-# OS generated
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+.pybuilder/
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# PEP 582
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# IDE
+.vscode/
+.idea/
+
+# OS generated files
 .DS_Store
 .DS_Store?
 ._*
@@ -57,4 +175,63 @@ coverage.xml
 .Trashes
 ehthumbs.db
 Thumbs.db
-```
+desktop.ini
+
+# Temporary folders
+tmp/
+temp/
+
+# Compressed files
+*.zip
+*.tar.gz
+*.tar.bz2
+*.tar.xz
+*.gz
+*.rar
+*.7z
+*.bz2
+*.xz
+*.Z
+*.lz
+*.lzo
+*.tar
+*.tgz
+*.tar.Z
+*.tar.lz
+*.tar.lzo
+*.arj
+*.cab
+*.deb
+*.dmg
+*.iso
+*.rpm
+*.zst
+*.lz4
+*.lzh
+*.z
+*.rz
+*.lrz
+*.lzma
+*.tlz
+*.txz
+*.tzo
+*.t7z
+*.tar.bz
+*.tar.xz
+*.tar.zst
+*.tar.lz4
+*.tar.lzh
+*.tar.arj
+*.tar.cab
+*.tar.deb
+*.tar.dmg
+*.tar.iso
+*.tar.rpm
+*.tar.z
+*.tar.rz
+*.tar.lrz
+*.tar.lzma
+*.tar.tlz
+*.tar.txz
+*.tar.tzo
+*.tar.t7z
