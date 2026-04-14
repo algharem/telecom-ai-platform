@@ -1,0 +1,97 @@
+[
+  {
+    "decision_id": "849445e3-78ba-41c0-beda-11f4ab3da88d",
+    "xapp_id": "xapp-smart-optimizer",
+    "timestamp": "2026-03-27T19:24:49.902021",
+    "target_cell": "gNB_002_Cell1",
+    "action_type": "HANDOVER_CONTROL",
+    "target_ue": "UE_gNB_002_003",
+    "priority": 2,
+    "trigger_metrics": {
+      "ue_cqi": 4,
+      "cell_load": 84
+    },
+    "predicted_outcome": "Handover to gNB_002_Cell2 for better experience [FAILED: gNB gNB not connected]",
+    "confidence": 0.75,
+    "control_parameters": {
+      "target_cell": "gNB_002_Cell2",
+      "handover_type": "intra_gnb"
+    }
+  },
+  {
+    "decision_id": "3f72640c-e791-4595-a640-687101a7339f",
+    "xapp_id": "xapp-smart-optimizer",
+    "timestamp": "2026-03-27T19:24:49.903426",
+    "target_cell": "gNB_003_Cell1",
+    "action_type": "HANDOVER_CONTROL",
+    "target_ue": "UE_gNB_003_000",
+    "priority": 2,
+    "trigger_metrics": {
+      "ue_cqi": 3,
+      "cell_load": 84
+    },
+    "predicted_outcome": "Handover to gNB_003_Cell2 for better experience [FAILED: gNB gNB not connected]",
+    "confidence": 0.75,
+    "control_parameters": {
+      "target_cell": "gNB_003_Cell2",
+      "handover_type": "intra_gnb"
+    }
+  },
+  {
+    "decision_id": "0ba73bbb-0769-4c6f-8071-8b550577ba23",
+    "xapp_id": "xapp-smart-optimizer",
+    "timestamp": "2026-03-27T19:24:50.003215",
+    "target_cell": "gNB_002_Cell1",
+    "action_type": "HANDOVER_CONTROL",
+    "target_ue": "UE_gNB_002_001",
+    "priority": 2,
+    "trigger_metrics": {
+      "ue_cqi": 3,
+      "cell_load": 85
+    },
+    "predicted_outcome": "Handover to gNB_002_Cell2 for better experience [FAILED: gNB gNB not connected]",
+    "confidence": 0.75,
+    "control_parameters": {
+      "target_cell": "gNB_002_Cell2",
+      "handover_type": "intra_gnb"
+    }
+  },
+  {
+    "decision_id": "2cda4684-4321-4ad6-b780-ae0e35db8835",
+    "xapp_id": "xapp-smart-optimizer",
+    "timestamp": "2026-03-27T19:24:50.003872",
+    "target_cell": "gNB_002_Cell1",
+    "action_type": "HANDOVER_CONTROL",
+    "target_ue": "UE_gNB_002_000",
+    "priority": 2,
+    "trigger_metrics": {
+      "ue_cqi": 1,
+      "cell_load": 86
+    },
+    "predicted_outcome": "Handover to gNB_002_Cell2 for better experience [FAILED: gNB gNB not connected]",
+    "confidence": 0.75,
+    "control_parameters": {
+      "target_cell": "gNB_002_Cell2",
+      "handover_type": "intra_gnb"
+    }
+  },
+  {
+    "decision_id": "1c5e1093-721e-462d-a422-6f65d17d228b",
+    "xapp_id": "xapp-smart-optimizer",
+    "timestamp": "2026-03-27T19:24:50.204731",
+    "target_cell": "gNB_002_Cell1",
+    "action_type": "HANDOVER_CONTROL",
+    "target_ue": "UE_gNB_002_002",
+    "priority": 2,
+    "trigger_metrics": {
+      "ue_cqi": 2,
+      "cell_load": 90
+    },
+    "predicted_outcome": "Handover to gNB_002_Cell2 for better experience [FAILED: gNB gNB not connected]",
+    "confidence": 0.75,
+    "control_parameters": {
+      "target_cell": "gNB_002_Cell2",
+      "handover_type": "intra_gnb"
+    }
+  }
+]

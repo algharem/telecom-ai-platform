@@ -1,0 +1,116 @@
+.
+├── api
+│   └── v1
+│       ├── api.py
+│       ├── endpoints
+│       │   ├── health.py
+│       │   ├── __init__.py
+│       │   ├── nwdaf.py
+│       │   ├── prediction.py
+│       │   ├── __pycache__
+│       │   │   ├── health.cpython-310.pyc
+│       │   │   ├── __init__.cpython-310.pyc
+│       │   │   ├── nwdaf.cpython-310.pyc
+│       │   │   ├── prediction.cpython-310.pyc
+│       │   │   └── xapp.cpython-310.pyc
+│       │   └── xapp.py
+│       ├── __init__.py
+│       └── __pycache__
+│           ├── api.cpython-310.pyc
+│           └── __init__.cpython-310.pyc
+├── app
+│   ├── config.py
+│   ├── dependencies.py
+│   ├── __init__.py
+│   ├── main.py
+│   └── __pycache__
+│       ├── config.cpython-310.pyc
+│       ├── __init__.cpython-310.pyc
+│       └── main.cpython-310.pyc
+├── config.yaml
+├── data
+├── decions.json
+├── infrastructure
+│   ├── database.py
+│   ├── __init__.py
+│   ├── message_bus.py
+│   └── __pycache__
+│       ├── database.cpython-310.pyc
+│       └── __init__.cpython-310.pyc
+├── models
+│   ├── __init__.py
+│   ├── ml_model.py
+│   ├── __pycache__
+│   │   ├── __init__.cpython-310.pyc
+│   │   └── schemas.cpython-310.pyc
+│   └── schemas.py
+├── oran
+│   ├── e2_interface.py
+│   ├── __init__.py
+│   ├── policies.py
+│   ├── __pycache__
+│   │   ├── e2_interface.cpython-310.pyc
+│   │   ├── __init__.cpython-310.pyc
+│   │   └── policies.cpython-310.pyc
+│   ├── ric_adapter.py
+│   └── rsm_control.py
+├── parsers
+│   ├── examples
+│   │   ├── import_open5gs2.py
+│   │   └── import_open5gs.py
+│   ├── importers
+│   │   ├── batch_importer.py
+│   │   ├── __init__.py
+│   │   ├── kafka_producer.py
+│   │   └── log_watcher.py
+│   ├── open5gs_logs
+│   │   └── log
+│   │       ├── amf.log
+│   │       ├── pcf.log
+│   │       ├── smf.log
+│   │       └── upf.log
+│   └── parsers
+│       ├── amf_parser.py
+│       ├── base_parser.py
+│       ├── __init__.py
+│       ├── open5gs_ingestor.py
+│       ├── pcf_parser.py
+│       ├── __pycache__
+│       │   ├── amf_parser.cpython-310.pyc
+│       │   ├── base_parser.cpython-310.pyc
+│       │   ├── __init__.cpython-310.pyc
+│       │   ├── open5gs_ingestor.cpython-310.pyc
+│       │   ├── pcf_parser.cpython-310.pyc
+│       │   ├── smf_parser.cpython-310.pyc
+│       │   └── upf_parser.cpython-310.pyc
+│       ├── smf_parser.py
+│       └── upf_parser.py
+├── phase3.md
+├── phase_zai.py
+├── readme.md
+├── requirements.txt
+├── services
+│   ├── __init__.py
+│   ├── kpi_simulator.py
+│   ├── ml_detector.py
+│   ├── nwdaf_analytics.py
+│   ├── oran_xapp.py
+│   └── __pycache__
+│       ├── __init__.cpython-310.pyc
+│       ├── kpi_simulator.cpython-310.pyc
+│       ├── ml_detector.cpython-310.pyc
+│       ├── nwdaf_analytics.cpython-310.pyc
+│       └── oran_xapp.cpython-310.pyc
+├── tree.txt
+└── utils
+    ├── exceptions.py
+    ├── __init__.py
+    ├── logging_config.py
+    ├── __pycache__
+    │   ├── exceptions.cpython-310.pyc
+    │   ├── __init__.cpython-310.pyc
+    │   ├── logging_config.cpython-310.pyc
+    │   └── time_series.cpython-310.pyc
+    └── time_series.py
+
+25 directories, 88 files
