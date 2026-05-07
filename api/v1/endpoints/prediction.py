@@ -59,12 +59,21 @@ async def predict_anomaly(
     start_time = time.time()
     
     try:
-        # If metrics not provided, fetch from data provider
+        # If metrics not provided or incomplete, fetch from data provider
         metrics_to_use = request.metrics
         fetch_source = "request"
         
-        if metrics_to_use is None:
-            logger.info(f"[PREDICT] Metrics not provided, fetching from data provider for {request.gnb_id}")
+        # Check if metrics are missing or incomplete
+        needs_fetch = (
+            metrics_to_use is None or 
+            metrics_to_use.prb_usage is None or
+            metrics_to_use.throughput is None or
+            metrics_to_use.latency is None or
+            metrics_to_use.packet_loss is None
+        )
+        
+        if needs_fetch:
+            logger.info(f"[PREDICT] Metrics incomplete/missing, fetching from data provider for {request.gnb_id}")
             provider = http_request.app.data_provider
             
             if not provider:
