@@ -20,3 +20,20 @@ kafka-python==2.0.2           # For RMR-like messaging
 paho-mqtt==1.6.1             # Alternative to E2AP
 asyncio-mqtt==0.16.1         # Async MQTT
 schedule==1.2.1              # Control loop timing
+
+# Phase 4: Event Streaming
+aiokafka==0.10.0              # Async Kafka producer/consumer
+confluent-kafka==2.3.0        # High-performance Kafka client
+aio-pika==12.1.1              # RabbitMQ support (alternative to Kafka)
+
+# Phase 5: ChatOps & Production
+openai==1.3.7                 # GPT integration for AIOpsAssistant
+python-dotenv==1.0.0          # Environment management
+slack-sdk==3.23.0             # Slack ChatOps integration
+azure-identity==1.14.0        # Azure SDK for Teams integration
+psycopg2-binary==2.9.9        # PostgreSQL adapter
+alembic==1.12.1               # Database migrations
+sqlalchemy==2.0.23            # ORM for database
+redis==5.0.1                  # Redis client
+tenacity==8.2.3               # Retry logic for resilience
+pydantic-settings==2.1.0      # Settings management
