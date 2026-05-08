@@ -81,17 +81,27 @@ class AnomalyDetector:
         
         Args:
             df: DataFrame with columns [prb_usage, throughput_mbps, latency_ms, packet_loss_percent]
+                or [prb_usage, throughput, latency, packet_loss]
         
         Returns:
             Training metrics
         """
         logger.info(f"Training model on {len(df)} records")
         
+        # Normalize column names (handle both naming conventions)
+        df_normalized = df.copy()
+        column_mapping = {
+            'throughput_mbps': 'throughput',
+            'latency_ms': 'latency',
+            'packet_loss_percent': 'packet_loss'
+        }
+        df_normalized = df_normalized.rename(columns=column_mapping)
+        
         # Prepare features
-        X = df[self.FEATURE_COLUMNS].copy()
+        X = df_normalized[self.FEATURE_COLUMNS].copy()
         
         # Handle missing values (forward fill for time series)
-        X = X.fillna(method='ffill').fillna(method='bfill')
+        X = X.ffill().bfill()
         
         # Scale features (critical for telecom: different units)
         self.scaler = StandardScaler()

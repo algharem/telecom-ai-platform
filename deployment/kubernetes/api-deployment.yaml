@@ -1,0 +1,115 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: telecom-ai-api
+  namespace: default
+  labels:
+    app: telecom-ai-api
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: telecom-ai-api
+  template:
+    metadata:
+      labels:
+        app: telecom-ai-api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: telecom-ai
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      
+      containers:
+      - name: api
+        image: telecom-ai-platform:latest
+        imagePullPolicy: IfNotPresent
+        
+        ports:
+        - name: http
+          containerPort: 8000
+          protocol: TCP
+        - name: metrics
+          containerPort: 8001
+          protocol: TCP
+        
+        env:
+        - name: DATA_SOURCE
+          value: "prometheus"
+        - name: PROMETHEUS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: telecom-ai-config
+              key: prometheus_url
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          value: "kafka:9092"
+        - name: SLACK_WEBHOOK_URL
+          valueFrom:
+            secretKeyRef:
+              name: telecom-ai-secrets
+              key: slack_webhook_url
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: telecom-ai-secrets
+              key: openai_api_key
+        
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+        
+        resources:
+          requests:
+            cpu: 500m
+            memory: 512Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+        
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+      
+      volumes:
+      - name: config
+        configMap:
+          name: telecom-ai-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: telecom-ai-api
+  namespace: default
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 8000
+    targetPort: http
+  selector:
+    app: telecom-ai-api

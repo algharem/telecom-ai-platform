@@ -3,11 +3,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import time
 import uuid
+import os
 
 from app.config import settings
 from api.v1.api import api_router
 from utils.logging_config import setup_logging
 from utils.exceptions import TelecomAIException
+from services.data_provider import create_data_provider, get_provider_config
+from services.anomaly_detector import AnomalyDetector
+from services.pipeline_monitor import PipelineMonitor
+from parsers.aggregators.gnb_aggregator import GnBMetricsAggregator
 
 
 # logger = setup_logging(settings.DEBUG)
@@ -18,12 +23,18 @@ app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
     description="""
-    AI-Driven Telecom Network Optimization Platform - Phase 1
+    AI-Driven Telecom Network Optimization Platform - Phase 1+2
     
     This API provides:
     - Real-time RAN KPI anomaly detection using Isolation Forest
-    - Synthetic KPI generation for testing
+    - Open5GS log parsing and aggregation (real-world data)
+    - Synthetic KPI generation for testing (simulator fallback)
     - 3GPP NWDAF-style analytics interface
+    
+    ## Data Sources
+    
+    * **Simulator**: Synthetic KPI generation with configurable anomalies
+    * **Logs**: Real Open5GS network function logs (AMF, UPF, NRF, AUSF)
     
     ## Telecom Context
     
@@ -41,6 +52,12 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc"
 )
+
+# Global services (initialized on startup)
+app.data_provider = None
+app.anomaly_detector = None
+app.pipeline_monitor = None
+app.gnb_aggregator = None
 
 # Middleware
 @app.middleware("http")
@@ -67,6 +84,63 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Startup and shutdown events
+@app.on_event("startup")
+async def startup_event():
+    """Initialize data pipeline and AI services on startup"""
+    try:
+        # Determine data source (default to simulator)
+        data_source = os.getenv("DATA_SOURCE", "simulator").lower()
+        logger.info(f"[STARTUP] Initializing data source: {data_source}")
+        
+        # Create data provider with environment variables
+        provider_config = get_provider_config(data_source, dict(os.environ))
+        logger.info(f"[STARTUP] Provider config: {provider_config}")
+        app.data_provider = create_data_provider(data_source, provider_config)
+        logger.info(f"[STARTUP] Data provider initialized: {app.data_provider.get_source_info()}")
+        
+        # Initialize anomaly detector with thresholds
+        anomaly_config = {
+            "prb_usage_percent": float(os.getenv("ANOMALY_PRB_THRESHOLD", 90)),
+            "latency_ms": float(os.getenv("ANOMALY_LATENCY_THRESHOLD", 50)),
+            "packet_loss_percent": float(os.getenv("ANOMALY_PACKET_LOSS_THRESHOLD", 1)),
+        }
+        app.anomaly_detector = AnomalyDetector(anomaly_config)
+        logger.info("[STARTUP] Anomaly detector initialized")
+        
+        # Initialize monitoring
+        app.pipeline_monitor = PipelineMonitor(retention_minutes=60)
+        logger.info("[STARTUP] Pipeline monitor initialized")
+        
+        # Initialize gNB aggregator for log processing
+        app.gnb_aggregator = GnBMetricsAggregator(window_seconds=60)
+        logger.info("[STARTUP] gNB aggregator initialized")
+        
+        logger.info("[STARTUP] All services initialized successfully")
+        
+    except Exception as e:
+        logger.error(f"[STARTUP] Failed to initialize services: {e}", exc_info=True)
+        raise
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup on shutdown"""
+    try:
+        if app.data_provider:
+            app.data_provider.close()
+            logger.info("[SHUTDOWN] Data provider closed")
+        
+        if app.gnb_aggregator:
+            # Flush any pending windows
+            pending = app.gnb_aggregator.flush()
+            logger.info(f"[SHUTDOWN] Flushed {len(pending)} pending windows")
+        
+        logger.info("[SHUTDOWN] Cleanup complete")
+    except Exception as e:
+        logger.error(f"[SHUTDOWN] Error during cleanup: {e}", exc_info=True)
 
 # Exception handlers
 @app.exception_handler(TelecomAIException)
